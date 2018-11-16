@@ -17,6 +17,7 @@ class Agent(object):
     self._direction = None
     self._scent = None
     self._vision = None
+    self._gt_vision = None
     self._items = None
     if load_filepath == None:
       self._id = simulator._add_agent(self)
@@ -35,6 +36,9 @@ class Agent(object):
   def vision(self):
     return self._vision
 
+  def gt_vision(self):
+    return self._gt_vision
+  
   def collected_items(self):
     return self._items
 
