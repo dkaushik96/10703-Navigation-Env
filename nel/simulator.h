@@ -758,7 +758,7 @@ struct agent_state {
                  && (unsigned int) abs(relative_position.y) <= config.vision_range
                  && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
                  && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
-                    add_color(relative_position, config.gt_vision_range,
+                    add_color(relative_position, config.vision_range, config.gt_vision_range,
                             config.agent_color, config.color_dimension);
                 }
             }
