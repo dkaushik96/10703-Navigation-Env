@@ -755,7 +755,7 @@ struct agent_state {
 
                 /* if the neighbor is in the visual field, add its color to the appropriate pixel */
                 if ((unsigned int) abs(relative_position.x) <= config.vision_range
-                 && (unsigned int) abs(relative_position.y) <= config.vision_range)
+                 && (unsigned int) abs(relative_position.y) <= config.vision_range
                  && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
                  && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
                     add_color(relative_position, config.gt_vision_range,
