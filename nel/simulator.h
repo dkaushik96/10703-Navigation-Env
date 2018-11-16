@@ -741,7 +741,7 @@ struct agent_state {
                 if (item.deletion_time == 0
                  && (unsigned int) abs(relative_position.x) <= config.vision_range
                  && (unsigned int) abs(relative_position.y) <= config.vision_range)
-		 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
+                 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
                  && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
                     add_color(relative_position, config.vision_range, config.gt_vision_range,
                             config.item_types[item.item_type].color, config.color_dimension);
@@ -756,7 +756,7 @@ struct agent_state {
                 /* if the neighbor is in the visual field, add its color to the appropriate pixel */
                 if ((unsigned int) abs(relative_position.x) <= config.vision_range
                  && (unsigned int) abs(relative_position.y) <= config.vision_range)
-		 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
+                 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
                  && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
                     add_color(relative_position, config.gt_vision_range,
                             config.agent_color, config.color_dimension);
@@ -1410,18 +1410,18 @@ public:
                     position relative_position = item.location - position(x, y) * config.patch_size;
                     float* pixel = state.vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
 		    float* gt_pixel = state.gt_vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
-                    for (unsigned int i = 0; i < config.color_dimension; i++)
+                    for (unsigned int i = 0; i < config.color_dimension; i++){
                         pixel[i] += config.item_types[item.item_type].color[i];
-			gt_pixel[i] += config.item_types[item.item_type].color[i];
+			gt_pixel[i] += config.item_types[item.item_type].color[i];}
                 }
 
                 for (const agent_state* agent : patch->data.agents) {
                     position relative_position = agent->current_position - position(x, y) * config.patch_size;
                     float* pixel = state.vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
 		    float* gt_pixel = state.gt_vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
-                    for (unsigned int i = 0; i < config.color_dimension; i++)
+                    for (unsigned int i = 0; i < config.color_dimension; i++){
                         pixel[i] += config.agent_color[i];
-			gt_pixel[i] += config.agent_color[i];
+			gt_pixel[i] += config.agent_color[i];}
                 }
             }
         }
