@@ -342,6 +342,7 @@ struct simulator_config {
     unsigned int scent_dimension;
     unsigned int color_dimension;
     unsigned int vision_range;
+    unsigned int gt_vision_range;
     bool allowed_movement_directions[(size_t) direction::COUNT];
     bool allowed_rotations[(size_t) direction::COUNT];
 
@@ -374,6 +375,7 @@ struct simulator_config {
         core::swap(first.scent_dimension, second.scent_dimension);
         core::swap(first.color_dimension, second.color_dimension);
         core::swap(first.vision_range, second.vision_range);
+	core::swap(first.gt_vision_range, second.gt_vision_range);
         core::swap(first.patch_size, second.patch_size);
         core::swap(first.gibbs_iterations, second.gibbs_iterations);
         core::swap(first.item_types, second.item_types);
@@ -418,6 +420,7 @@ private:
         scent_dimension = src.scent_dimension;
         color_dimension = src.color_dimension;
         vision_range = src.vision_range;
+	gt_vision_range = src.gt_vision_range;
         patch_size = src.patch_size;
         gibbs_iterations = src.gibbs_iterations;
         collision_policy = src.collision_policy;
@@ -469,6 +472,7 @@ bool read(simulator_config& config, Stream& in) {
      || !read(config.scent_dimension, in)
      || !read(config.color_dimension, in)
      || !read(config.vision_range, in)
+     || !read(config.gt_vision_range, in)
      || !read(config.allowed_movement_directions, in)
      || !read(config.allowed_rotations, in)
      || !read(config.patch_size, in)
@@ -512,6 +516,7 @@ bool write(const simulator_config& config, Stream& out) {
         && write(config.scent_dimension, out)
         && write(config.color_dimension, out)
         && write(config.vision_range, out)
+	&& write(config.gt_vision_range, out)
         && write(config.allowed_movement_directions, out)
         && write(config.allowed_rotations, out)
         && write(config.patch_size, out)
@@ -640,6 +645,13 @@ struct agent_state {
      * of D floats (where D is the color dimension). 
      */
     float* current_vision;
+	
+    /** 
+     * GT Visual field at the current position. Consists of 'pixels' 
+     * in row-major order, where each pixel is a contiguous chunk 
+     * of D floats (where D is the color dimension). 
+     */
+    float* gt_current_vision;
     
     /**
      * `true` if the agent has already acted (i.e., moved) in the 
@@ -667,7 +679,7 @@ struct agent_state {
     std::mutex lock;
 
     inline void add_color(
-            position relative_position, unsigned int vision_range,
+            position relative_position, unsigned int vision_range, unsigned int gt_vision_range,
             const float* color, unsigned int color_dimension)
     {
         switch (current_direction) {
@@ -689,6 +701,12 @@ struct agent_state {
         unsigned int offset = (x*(2*vision_range + 1) + y) * color_dimension;
         for (unsigned int i = 0; i < color_dimension; i++)
             current_vision[offset + i] += color[i];
+	    
+	unsigned int gt_x = (unsigned int) (relative_position.x + gt_vision_range);
+        unsigned int gt_y = (unsigned int) (relative_position.y + gt_vision_range);
+        unsigned int gt_offset = (gt_x*(2*gt_vision_range + 1) + gt_y) * color_dimension;
+        for (unsigned int i = 0; i < color_dimension; i++)
+            gt_current_vision[gt_offset + i] += color[i];
     }
 
     template<typename T>
@@ -703,6 +721,8 @@ struct agent_state {
             current_scent[i] = 0.0f;
         for (unsigned int i = 0; i < (2*config.vision_range + 1) * (2*config.vision_range + 1) * config.color_dimension; i++)
             current_vision[i] = 0.0f;
+	for (unsigned int i = 0; i < (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension; i++)
+            gt_current_vision[i] = 0.0f;
 
         for (unsigned int i = 0; i < 4; i++) {
             /* iterate over neighboring items, and add their contributions to scent and vision */
@@ -720,8 +740,10 @@ struct agent_state {
                 position relative_position = item.location - current_position;
                 if (item.deletion_time == 0
                  && (unsigned int) abs(relative_position.x) <= config.vision_range
-                 && (unsigned int) abs(relative_position.y) <= config.vision_range) {
-                    add_color(relative_position, config.vision_range,
+                 && (unsigned int) abs(relative_position.y) <= config.vision_range)
+		 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
+                 && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
+                    add_color(relative_position, config.vision_range, config.gt_vision_range,
                             config.item_types[item.item_type].color, config.color_dimension);
                 }
             }
@@ -733,8 +755,10 @@ struct agent_state {
 
                 /* if the neighbor is in the visual field, add its color to the appropriate pixel */
                 if ((unsigned int) abs(relative_position.x) <= config.vision_range
-                 && (unsigned int) abs(relative_position.y) <= config.vision_range) {
-                    add_color(relative_position, config.vision_range,
+                 && (unsigned int) abs(relative_position.y) <= config.vision_range)
+		 && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
+                 && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
+                    add_color(relative_position, config.gt_vision_range,
                             config.agent_color, config.color_dimension);
                 }
             }
@@ -745,6 +769,7 @@ struct agent_state {
     inline static void free(agent_state& agent) {
         core::free(agent.current_scent);
         core::free(agent.current_vision);
+	core::free(agent.gt_current_vision);
         core::free(agent.collected_items);
         agent.lock.~mutex();
     }
@@ -780,6 +805,8 @@ inline bool init(
     }
     agent.current_vision = (float*) malloc(sizeof(float)
         * (2*config.vision_range + 1) * (2*config.vision_range + 1) * config.color_dimension);
+    agent.gt_current_vision = (float*) malloc(sizeof(float)
+        * (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension);
     if (agent.current_vision == NULL) {
         fprintf(stderr, "init ERROR: Insufficient memory for agent_state.current_vision.\n");
         free(agent.current_scent); return false;
@@ -787,7 +814,7 @@ inline bool init(
     agent.collected_items = (unsigned int*) calloc(config.item_types.length, sizeof(unsigned int));
     if (agent.collected_items == NULL) {
         fprintf(stderr, "init ERROR: Insufficient memory for agent_state.collected_items.\n");
-        free(agent.current_scent); free(agent.current_vision); return false;
+        free(agent.current_scent); free(agent.current_vision); free(agent.gt_current_vision); return false;
     }
 
     agent.agent_acted = false;
@@ -804,7 +831,7 @@ inline bool init(
                 FILE* out = stderr;
                 core::print("init ERROR: An agent already occupies position ", out);
                 print(agent.current_position, out); core::print(".\n", out);
-                free(agent.current_scent); free(agent.current_vision);
+                free(agent.current_scent); free(agent.current_vision); free(agent.gt_current_vision);
                 free(agent.collected_items); agent.lock.~mutex();
                 neighborhood[index]->data.patch_lock.unlock();
                 return false;
@@ -843,6 +870,8 @@ inline bool read(agent_state& agent, Stream& in, const simulator_config& config)
     }
     agent.current_vision = (float*) malloc(sizeof(float)
         * (2*config.vision_range + 1) * (2*config.vision_range + 1) * config.color_dimension);
+    agent.gt_current_vision = (float*) malloc(sizeof(float)
+        * (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension);
     if (agent.current_vision == NULL) {
         fprintf(stderr, "read ERROR: Insufficient memory for agent_state.current_vision.\n");
         free(agent.current_scent); return false;
@@ -850,7 +879,7 @@ inline bool read(agent_state& agent, Stream& in, const simulator_config& config)
     agent.collected_items = (unsigned int*) malloc(sizeof(unsigned int) * config.item_types.length);
     if (agent.collected_items == NULL) {
         fprintf(stderr, "read ERROR: Insufficient memory for agent_state.collected_items.\n");
-        free(agent.current_scent); free(agent.current_vision); return false;
+        free(agent.current_scent); free(agent.current_vision); free(agent.gt_current_vision); return false;
     }
     new (&agent.lock) std::mutex();
 
@@ -858,11 +887,12 @@ inline bool read(agent_state& agent, Stream& in, const simulator_config& config)
      || !read(agent.current_direction, in)
      || !read(agent.current_scent, in, config.scent_dimension)
      || !read(agent.current_vision, in, (2*config.vision_range + 1) * (2*config.vision_range + 1) * config.color_dimension)
+     || !read(agent.gt_current_vision, in, (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension)
      || !read(agent.agent_acted, in)
      || !read(agent.requested_position, in)
      || !read(agent.requested_direction, in)
      || !read(agent.collected_items, in, (unsigned int) config.item_types.length)) {
-         free(agent.current_scent); free(agent.current_vision);
+         free(agent.current_scent); free(agent.current_vision); free(agent.gt_current_vision);
          free(agent.collected_items); return false;
      }
      return true;
@@ -878,6 +908,7 @@ inline bool write(const agent_state& agent, Stream& out, const simulator_config&
         && write(agent.current_direction, out)
         && write(agent.current_scent, out, config.scent_dimension)
         && write(agent.current_vision, out, (2*config.vision_range + 1) * (2*config.vision_range + 1) * config.color_dimension)
+	&& write(agent.gt_current_vision, out, (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension)
         && write(agent.agent_acted, out)
         && write(agent.requested_position, out)
         && write(agent.requested_direction, out)
@@ -893,6 +924,7 @@ struct patch_state {
     bool fixed;
     float* scent;
     float* vision;
+    float* gt_vision;
     item* items;
     unsigned int item_count;
     position* agent_positions;
@@ -904,6 +936,7 @@ struct patch_state {
         core::move(src.fixed, dst.fixed);
         core::move(src.scent, dst.scent);
         core::move(src.vision, dst.vision);
+	core::move(src.gt_vision, dst.gt_vision);
         core::move(src.items, dst.items);
         core::move(src.item_count, dst.item_count);
         core::move(src.agent_positions, dst.agent_positions);
@@ -914,6 +947,7 @@ struct patch_state {
     static inline void free(patch_state& patch) {
         core::free(patch.scent);
         core::free(patch.vision);
+	core::free(patch.gt_vision);
         core::free(patch.items);
         core::free(patch.agent_positions);
         core::free(patch.agent_directions);
@@ -929,6 +963,7 @@ struct patch_state {
             return false;
         }
         vision = (float*) calloc(n * n * color_dimension, sizeof(float));
+	gt_vision = (float*) calloc(n * n * color_dimension, sizeof(float));
         if (vision == NULL) {
             fprintf(stderr, "patch_state.init_helper ERROR: Insufficient memory for vision.\n");
             core::free(scent); return false;
@@ -936,18 +971,18 @@ struct patch_state {
         items = (item*) malloc(sizeof(item) * item_count);
         if (items == NULL) {
             fprintf(stderr, "patch_state.init_helper ERROR: Insufficient memory for items.\n");
-            core::free(scent); core::free(vision); return false;
+            core::free(scent); core::free(vision); core::free(gt_vision); return false;
         }
         agent_positions = (position*) malloc(sizeof(position) * agent_count);
         if (agent_positions == NULL) {
             fprintf(stderr, "patch_state.init_helper ERROR: Insufficient memory for agent_positions.\n");
-            core::free(scent); core::free(vision);
+            core::free(scent); core::free(vision); core::free(gt_vision); 
             core::free(items); return false;
         }
         agent_directions = (direction*) malloc(sizeof(direction) * agent_count);
         if (agent_directions == NULL) {
             fprintf(stderr, "patch_state.init_helper ERROR: Insufficient memory for agent_directions.\n");
-            core::free(scent); core::free(vision);
+            core::free(scent); core::free(vision); core::free(gt_vision); 
             core::free(items); return false;
         }
         return true;
@@ -979,6 +1014,7 @@ bool read(patch_state& patch, Stream& in, const simulator_config& config) {
         && patch.init_helper(n, config.scent_dimension, config.color_dimension, patch.item_count, patch.agent_count)
         && read(patch.scent, in, n * n * config.scent_dimension)
         && read(patch.vision, in, n * n * config.color_dimension)
+	&& read(patch.gt_vision, in, n * n * config.color_dimension)
         && read(patch.items, in, patch.item_count)
         && read(patch.agent_positions, in, patch.agent_count)
         && read(patch.agent_directions, in, patch.agent_count);
@@ -994,6 +1030,7 @@ bool write(const patch_state& patch, Stream& out, const simulator_config& config
         && write(patch.item_count, out) && write(patch.agent_count, out)
         && write(patch.scent, out, n * n * config.scent_dimension)
         && write(patch.vision, out, n * n * config.color_dimension)
+	&& write(patch.gt_vision, out, n * n * config.color_dimension)
         && write(patch.items, out, patch.item_count)
         && write(patch.agent_positions, out, patch.agent_count)
         && write(patch.agent_directions, out, patch.agent_count);
@@ -1372,15 +1409,19 @@ public:
                     if (item.deletion_time != 0) continue;
                     position relative_position = item.location - position(x, y) * config.patch_size;
                     float* pixel = state.vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
+		    float* gt_pixel = state.gt_vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
                     for (unsigned int i = 0; i < config.color_dimension; i++)
                         pixel[i] += config.item_types[item.item_type].color[i];
+			gt_pixel[i] += config.item_types[item.item_type].color[i];
                 }
 
                 for (const agent_state* agent : patch->data.agents) {
                     position relative_position = agent->current_position - position(x, y) * config.patch_size;
                     float* pixel = state.vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
+		    float* gt_pixel = state.gt_vision + ((relative_position.x*config.patch_size + relative_position.y)*config.color_dimension);
                     for (unsigned int i = 0; i < config.color_dimension; i++)
                         pixel[i] += config.agent_color[i];
+			gt_pixel[i] += config.agent_color[i];
                 }
             }
         }
