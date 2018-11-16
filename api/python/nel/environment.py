@@ -37,6 +37,9 @@ else:
       - `vision`: Matrix with shape `[2R+1, 2R+1, V]`, 
         where `R` is the vision range and `V` is the 
         vision/color dimensionality.
+      - 'gt_vision': Matrix with shape `[2r+1, 2r+1, V]`,
+        where `r` is the desired vision range and `V` is the 
+        vision/color dimensionality.
       - `moved`: Binary value indicating whether the last 
         action resulted in the agent moving.
   
@@ -95,9 +98,14 @@ else:
       scent_shape = [len(self.sim_config.items[0].scent)]
       vision_dim = len(self.sim_config.items[0].color)
       vision_range = self.sim_config.vision_range
+      gt_vision_range = self.sim_config.gt_vision_range
       vision_shape = [
         2 * vision_range + 1, 
         2 * vision_range + 1, 
+        vision_dim]
+      gt_vision_shape = [
+        2 * gt_vision_range + 1,
+        2 * gt_vision_range + 1,
         vision_dim]
     
       min_float = np.finfo(np.float32).min
@@ -106,6 +114,8 @@ else:
       max_scent = max_float * np.ones(scent_shape)
       min_vision = min_float * np.ones(vision_shape)
       max_vision = max_float * np.ones(vision_shape)
+      min_gt_vision = min_float * np.ones(gt_vision_shape)
+      max_gt_vision = max_float * np.ones(gt_vision_shape)
 
       # Observations in this environment consist of a scent 
       # vector, a vision matrix, and a binary value 
@@ -114,6 +124,7 @@ else:
       self.observation_space = spaces.Dict({
         'scent': spaces.Box(low=min_scent, high=max_scent), 
         'vision': spaces.Box(low=min_vision, high=max_vision),
+        'gt_vision': spaces.Box(low=max_vision, high=max_vision),
         'moved': spaces.Discrete(2)})
 
       # There are three possible actions:
@@ -139,6 +150,9 @@ else:
               `[2R+1, 2R+1, V]`, where `R` is the vision 
               range and `V` is the vision/color 
               dimensionality.
+            - 'gt_vision': Matrix with shape `[2r+1, 2r+1, V]`,
+              where `r` is the desired vision range and `V`
+              is the vision/color dimensionality.
             - `moved`: Binary value indicating whether the 
               last action resulted in the agent moving.
         reward (float): Amount of reward obtained from the 
@@ -161,6 +175,7 @@ else:
       self.state = {
         'scent': self._agent.scent(), 
         'vision': self._agent.vision(), 
+        'gt_vision': self._agent.gt_vision(),
         'moved': np.any(prev_position != position)}
     
       return self.state, reward, done, {}
@@ -177,7 +192,8 @@ else:
           bottom_left=(-70, -70), top_right=(70, 70))
       self.state = {
         'scent': self._agent.scent(), 
-        'vision': self._agent.vision(), 
+        'vision': self._agent.vision(),
+        'gt_vision': self._agent.gt_vision(),
         'moved': False}
       return self.state
 
