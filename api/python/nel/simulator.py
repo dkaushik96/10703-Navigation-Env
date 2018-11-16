@@ -40,6 +40,7 @@ class SimulatorConfig(object):
       allowed_turn_directions:     A list of RelativeDirections that the each
                                    agent is permitted to turn.
       vision_range:                Vision range of each agent.
+      gt_vision_range:             Vision range of GT for SL.
       patch_size:                  Size of each patch used by the map
                                    generator.
       gibbs_num_iter:              Number of Gibbs sampling iterations
@@ -56,6 +57,7 @@ class SimulatorConfig(object):
     self.scent_num_dims = len(items[0].scent)
     self.color_num_dims = len(items[0].color)
     self.vision_range = vision_range
+    self.gt_vision_range = gt_vision_range
     self.patch_size = patch_size
     self.gibbs_num_iter = gibbs_num_iter
     self.items = items
@@ -186,7 +188,7 @@ class Simulator(object):
       self._handle = simulator_c.new(sim_config.seed,
         sim_config.max_steps_per_movement, [d.value for d in sim_config.allowed_movement_directions],
         [d.value for d in sim_config.allowed_turn_directions], sim_config.scent_num_dims,
-        sim_config.color_num_dims, sim_config.vision_range, sim_config.patch_size, sim_config.gibbs_num_iter,
+        sim_config.color_num_dims, sim_config.vision_range, sim_config.gt_vision_range, sim_config.patch_size, sim_config.gibbs_num_iter,
         [(i.name, i.scent, i.color, i.required_item_counts, i.required_item_costs, i.blocks_movement, i.intensity_fn, i.intensity_fn_args, i.interaction_fns) for i in sim_config.items],
         sim_config.agent_color, sim_config.collision_policy.value, sim_config.decay_param,
         sim_config.diffusion_param, sim_config.deleted_item_lifetime, self._step_callback,
@@ -205,9 +207,9 @@ class Simulator(object):
       (self._time, self._client_handle, agent_states) = simulator_c.start_client(
           server_address, port, self._step_callback, on_lost_connection_callback, agent_ids)
       for i in range(len(agent_ids)):
-        (position, direction, scent, vision, items) = agent_states[i]
+        (position, direction, scent, vision, gt_vision, items) = agent_states[i]
         agent = agent_values[i]
-        (agent._position, agent._direction, agent._scent, agent._vision, agent._items) = (position, Direction(direction), scent, vision, items)
+        (agent._position, agent._direction, agent._scent, agent._vision, agent._gt_vision, agent._items) = (position, Direction(direction), scent, vision, gt_vision, items)
     else:
       # load local server or simulator from file
       if load_filepath == None:
@@ -215,9 +217,9 @@ class Simulator(object):
       self._load_agents(load_filepath, load_time)
       (self._time, self._handle, agent_states) = simulator_c.load(load_filepath + str(load_time), self._step_callback, save_frequency, save_filepath)
       for agent_state in agent_states:
-        (position, direction, scent, vision, items, id) = agent_state
+        (position, direction, scent, vision, gt_vision, items, id) = agent_state
         agent = self.agents[id]
-        (agent._position, agent._direction, agent._scent, agent._vision, agent._items) = (position, Direction(direction), scent, vision, items)
+        (agent._position, agent._direction, agent._scent, agent._vision, agent._gt_vision, agent._items) = (position, Direction(direction), scent, vision, gt_vision, items)
       if is_server:
         self._server_handle = simulator_c.start_server(
           self._handle, port, conn_queue_capacity, num_workers)
@@ -242,9 +244,9 @@ class Simulator(object):
     Returns:
       The new agent's ID.
     """
-    (position, direction, scent, vision, items, id) = simulator_c.add_agent(self._handle, self._client_handle)
+    (position, direction, scent, vision, gt_vision, items, id) = simulator_c.add_agent(self._handle, self._client_handle)
     self.agents[id] = agent
-    (agent._position, agent._direction, agent._scent, agent._vision, agent._items) = (position, Direction(direction), scent, vision, items)
+    (agent._position, agent._direction, agent._scent, agent._vision, agent._gt_vision, agent._items) = (position, Direction(direction), scent, vision, gt_vision, items)
     return id
 
   def move(self, agent, direction, num_steps=1):
@@ -300,9 +302,9 @@ class Simulator(object):
     """
     self._time += 1
     for agent_state in agent_states:
-      (position, direction, scent, vision, items, id) = agent_state
+      (position, direction, scent, vision, gt_vision, items, id) = agent_state
       agent = self.agents[id]
-      (agent._position, agent._direction, agent._scent, agent._vision, agent._items) = (position, Direction(direction), scent, vision, items)
+      (agent._position, agent._direction, agent._scent, agent._vision, agent._gt_vision, agent._items) = (position, Direction(direction), scent, vision, gt_vision, items)
     if saved:
       self._save_agents()
     self._on_step()
