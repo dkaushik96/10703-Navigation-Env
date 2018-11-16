@@ -294,7 +294,7 @@ static inline bool build_py_agent(
     for (unsigned int i = 0; i < vision_size; i++)
         vision[i] = agent.current_vision[i];
     for (unsigned int i = 0; i < gt_vision_size; i++)
-        gt_vision[i] = agent.current_gt_vision[i];
+        gt_vision[i] = agent.gt_current_vision[i];
     for (unsigned int i = 0; i < config.item_types.length; i++)
         items[i] = agent.collected_items[i];
 
@@ -336,7 +336,7 @@ static PyObject* build_py_agent(
 {
     PyObject* py_position; PyObject* py_direction;
     PyObject* py_scent; PyObject* py_vision; PyObject* py_gt_vision; PyObject* py_items;
-    if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_items))
+    if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items))
         return NULL;
     PyObject* py_agent_id = PyLong_FromUnsignedLongLong(agent_id);
     PyObject* py_agent = Py_BuildValue("(OOOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items, py_agent_id);
