@@ -740,7 +740,7 @@ struct agent_state {
                 position relative_position = item.location - current_position;
                 if (item.deletion_time == 0
                  && (unsigned int) abs(relative_position.x) <= config.vision_range
-                 && (unsigned int) abs(relative_position.y) <= config.vision_range)
+                 && (unsigned int) abs(relative_position.y) <= config.vision_range
                  && (unsigned int) abs(relative_position.x) <= config.gt_vision_range
                  && (unsigned int) abs(relative_position.y) <= config.gt_vision_range){
                     add_color(relative_position, config.vision_range, config.gt_vision_range,
