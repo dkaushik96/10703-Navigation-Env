@@ -27,7 +27,7 @@ class SimulatorConfig(object):
   """Represents a configuration for a simulator."""
 
   def __init__(self, max_steps_per_movement, allowed_movement_directions,
-      allowed_turn_directions, vision_range, patch_size, gibbs_num_iter, items,
+      allowed_turn_directions, vision_range, gt_vision_range, patch_size, gibbs_num_iter, items,
       agent_color, collision_policy, decay_param, diffusion_param,
       deleted_item_lifetime, seed=0):
     """Creates a new simulator configuration.
