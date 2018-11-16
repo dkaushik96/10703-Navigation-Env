@@ -124,7 +124,7 @@ else:
       self.observation_space = spaces.Dict({
         'scent': spaces.Box(low=min_scent, high=max_scent), 
         'vision': spaces.Box(low=min_vision, high=max_vision),
-        'gt_vision': spaces.Box(low=max_vision, high=max_vision),
+        'gt_vision': spaces.Box(low=min_gt_vision, high=max_gt_vision),
         'moved': spaces.Discrete(2)})
 
       # There are three possible actions:
