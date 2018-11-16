@@ -50,7 +50,7 @@ def make_config():
               [InteractionFunction.CROSS, 10.0, 15.0, 20.0, -200.0, -20.0, 1.0] # parameters for interaction between item 3 and item 3
             ]))
   # construct the simulator configuration
-  return SimulatorConfig(max_steps_per_movement=1, vision_range=5,
+  return SimulatorConfig(max_steps_per_movement=1, vision_range=5, gt_vision_range=10,
     allowed_movement_directions=[RelativeDirection.FORWARD],
     allowed_turn_directions=[RelativeDirection.LEFT, RelativeDirection.RIGHT],
     patch_size=32, gibbs_num_iter=10, items=items, agent_color=[0.0, 0.0, 1.0],
