@@ -73,7 +73,7 @@ class MapVisualizer(object):
 		self._ax.set_xlim(self._xlim)
 		self._ax.set_ylim(self._ylim)
 		for patch in map:
-			(patch_position, fixed, scent, vision, items, agents) = patch
+			(patch_position, fixed, scent, vision, gt_vision, items, agents) = patch
 			color = (0, 0, 0, 0.3) if fixed else (0, 0, 0, 0.1)
 
 			vertical_lines = np.empty((n + 1, 2, 2))
