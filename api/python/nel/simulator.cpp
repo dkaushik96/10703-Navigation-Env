@@ -222,7 +222,7 @@ bool save(const simulator<py_simulator_data>* sim, uint64_t time)
 }
 
 /**
- * Constructs the Python objects `py_position`, `py_scent`, `py_vision`, and
+ * Constructs the Python objects `py_position`, `py_scent`, `py_vision`, `py_gt_vision`, and
  * `py_items` and stores the state of the given `agent`.
  *
  * \param   agent       The agent whose state is copied into the Python
@@ -237,11 +237,15 @@ bool save(const simulator<py_simulator_data>* sim, uint64_t time)
  *                      the current perceived vision of `agent`. This array
  *                      will have shape
  *                      `(2*config.vision_range + 1, 2*config.vision_range + 1, config.color_dimension)`.
+ * \param   py_gt_vision   The output numpy array of type float that will contain
+ *                      the current perceived gt_vision of `agent`. This array
+ *                      will have shape
+ *                      `(2*config.gt_vision_range + 1, 2*config.gt_vision_range + 1, config.color_dimension)`.
  * \param   py_items    The output numpy array of type uint64 that will contain
  *                      the counts of the collected items. This array is
  *                      parallel to the array of `item_types` in `config`.
  * \returns `true` if successful; and `false` otherwise. Upon failure,
- *          `py_position`, `py_scent`, `py_vision`, and `py_items` are
+ *          `py_position`, `py_scent`, `py_vision`, `py_gt_vision`, and `py_items` are
  *          uninitialized.
  */
 static inline bool build_py_agent(
@@ -251,6 +255,7 @@ static inline bool build_py_agent(
         PyObject*& py_direction,
         PyObject*& py_scent,
         PyObject*& py_vision,
+	PyObject*& py_gt_vision,
         PyObject*& py_items)
 {
     /* first copy all arrays in 'agent' */
@@ -270,9 +275,15 @@ static inline bool build_py_agent(
         PyErr_NoMemory(); free(positions); free(scent);
         return false;
     }
+    unsigned int gt_vision_size = (2*config.gt_vision_range + 1) * (2*config.gt_vision_range + 1) * config.color_dimension;
+    float* gt_vision = (float*) malloc(sizeof(float) * gt_vision_size);
+    if (gt_vision == NULL) {
+        PyErr_NoMemory(); free(positions); free(scent);
+        return false;
+    }
     uint64_t* items = (uint64_t*) malloc(sizeof(uint64_t) * config.item_types.length);
     if (items == NULL) {
-        PyErr_NoMemory(); free(positions); free(scent); free(vision);
+        PyErr_NoMemory(); free(positions); free(scent); free(vision); free(gt_vision);
         return false;
     }
 
@@ -282,6 +293,8 @@ static inline bool build_py_agent(
         scent[i] = agent.current_scent[i];
     for (unsigned int i = 0; i < vision_size; i++)
         vision[i] = agent.current_vision[i];
+    for (unsigned int i = 0; i < gt_vision_size; i++)
+        gt_vision[i] = agent.current_gt_vision[i];
     for (unsigned int i = 0; i < config.item_types.length; i++)
         items[i] = agent.collected_items[i];
 
@@ -291,11 +304,16 @@ static inline bool build_py_agent(
             2 * (npy_intp) config.vision_range + 1,
             2 * (npy_intp) config.vision_range + 1,
             (npy_intp) config.color_dimension};
+    npy_intp gt_vision_dim[] = {
+            2 * (npy_intp) config.gt_vision_range + 1,
+            2 * (npy_intp) config.gt_vision_range + 1,
+            (npy_intp) config.color_dimension};
     npy_intp items_dim[] = {(npy_intp) config.item_types.length};
     py_position = PyArray_SimpleNewFromData(1, pos_dim, NPY_INT64, positions);
     py_direction = PyLong_FromSize_t((size_t) agent.current_direction);
     py_scent = PyArray_SimpleNewFromData(1, scent_dim, NPY_FLOAT, scent);
     py_vision = PyArray_SimpleNewFromData(3, vision_dim, NPY_FLOAT, vision);
+    py_gt_vision = PyArray_SimpleNewFromData(3, gt_vision_dim, NPY_FLOAT, gt_vision);
     py_items = PyArray_SimpleNewFromData(1, items_dim, NPY_UINT64, items);
     return true;
 }
@@ -317,13 +335,13 @@ static PyObject* build_py_agent(
         uint64_t agent_id)
 {
     PyObject* py_position; PyObject* py_direction;
-    PyObject* py_scent; PyObject* py_vision; PyObject* py_items;
+    PyObject* py_scent; PyObject* py_vision; PyObject* py_gt_vision; PyObject* py_items;
     if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_items))
         return NULL;
     PyObject* py_agent_id = PyLong_FromUnsignedLongLong(agent_id);
-    PyObject* py_agent = Py_BuildValue("(OOOOOO)", py_position, py_direction, py_scent, py_vision, py_items, py_agent_id);
+    PyObject* py_agent = Py_BuildValue("(OOOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items, py_agent_id);
     Py_DECREF(py_position); Py_DECREF(py_direction);
-    Py_DECREF(py_scent); Py_DECREF(py_vision);
+    Py_DECREF(py_scent); Py_DECREF(py_vision); Py_DECREF(py_gt_vision);
     Py_DECREF(py_items); Py_DECREF(py_agent_id);
     return py_agent;
 }
@@ -343,12 +361,12 @@ static PyObject* build_py_agent(
         const simulator_config& config)
 {
     PyObject* py_position; PyObject* py_direction;
-    PyObject* py_scent; PyObject* py_vision; PyObject* py_items;
-    if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_items))
+    PyObject* py_scent; PyObject* py_vision; PyObject* py_gt_vision; PyObject* py_items;
+    if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items))
         return NULL;
-    PyObject* py_agent = Py_BuildValue("(OOOOO)", py_position, py_direction, py_scent, py_vision, py_items);
+    PyObject* py_agent = Py_BuildValue("(OOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items);
     Py_DECREF(py_position); Py_DECREF(py_direction);
-    Py_DECREF(py_scent); Py_DECREF(py_vision);
+    Py_DECREF(py_scent); Py_DECREF(py_vision); Py_DECREF(py_gt_vision);
     Py_DECREF(py_items);
     return py_agent;
 }
@@ -601,6 +619,7 @@ static inline void import_errors() {
  *                  - (int) The scent dimension.
  *                  - (int) The color dimension for visual perception.
  *                  - (int) The range of vision for all agents.
+ *                  - (int) The range of gt_vision for all agents.
  *                  - (int) The patch size.
  *                  - (int) The number of Gibbs sampling iterations when
  *                    initializing items in new patches.
@@ -653,7 +672,7 @@ static PyObject* simulator_new(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(
       args, "IIOOIIIIIOOIffIOIz", &seed, &config.max_steps_per_movement,
       &py_allowed_movement_directions, &py_allowed_turn_directions, &config.scent_dimension,
-      &config.color_dimension, &config.vision_range, &config.patch_size, &config.gibbs_iterations,
+      &config.color_dimension, &config.vision_range, &config.gt_vision_range, &config.patch_size, &config.gibbs_iterations,
       &py_items, &py_agent_color, &collision_policy, &config.decay_param, &config.diffusion_param,
       &config.deleted_item_lifetime, &py_callback, &save_frequency, &save_filepath)) {
         fprintf(stderr, "Invalid argument types in the call to 'simulator_c.new'.\n");
@@ -1305,13 +1324,17 @@ static PyObject* build_py_map(
         npy_intp n = (npy_intp) config.patch_size;
         float* scent = (float*) malloc(sizeof(float) * n * n * config.scent_dimension);
         float* vision = (float*) malloc(sizeof(float) * n * n * config.color_dimension);
+	float* gt_vision = (float*) malloc(sizeof(float) * n * n * config.color_dimension);
         memcpy(scent, patch.scent, sizeof(float) * n * n * config.scent_dimension);
         memcpy(vision, patch.vision, sizeof(float) * n * n * config.color_dimension);
+	memcpy(gt_vision, patch.gt_vision, sizeof(float) * n * n * config.color_dimension);
 
         npy_intp scent_dim[] = {n, n, (npy_intp) config.scent_dimension};
         npy_intp vision_dim[] = {n, n, (npy_intp) config.color_dimension};
+	npy_intp gt_vision_dim[] = {n, n, (npy_intp) config.color_dimension};
         PyObject* py_scent = PyArray_SimpleNewFromData(3, scent_dim, NPY_FLOAT, scent);
         PyObject* py_vision = PyArray_SimpleNewFromData(3, vision_dim, NPY_FLOAT, vision);
+	PyObject* py_gt_vision = PyArray_SimpleNewFromData(3, gt_vision_dim, NPY_FLOAT, gt_vision);
 
         PyObject* fixed = patch.fixed ? Py_True : Py_False;
         Py_INCREF(fixed);
@@ -1319,6 +1342,7 @@ static PyObject* build_py_map(
         Py_DECREF(fixed);
         Py_DECREF(py_scent);
         Py_DECREF(py_vision);
+	Py_DECREF(py_gt_vision);
         Py_DECREF(py_items);
         Py_DECREF(py_agents);
         PyList_SetItem(list, index, py_patch);
