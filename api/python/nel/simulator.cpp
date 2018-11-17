@@ -670,7 +670,7 @@ static PyObject* simulator_new(PyObject *self, PyObject *args)
     unsigned int save_frequency;
     char* save_filepath;
     if (!PyArg_ParseTuple(
-      args, "IIOOIIIIIOOIffIOIz", &seed, &config.max_steps_per_movement,
+      args, "IIOOIIIIIIOOIffIOIz", &seed, &config.max_steps_per_movement,
       &py_allowed_movement_directions, &py_allowed_turn_directions, &config.scent_dimension,
       &config.color_dimension, &config.vision_range, &config.gt_vision_range, &config.patch_size, &config.gibbs_iterations,
       &py_items, &py_agent_color, &collision_policy, &config.decay_param, &config.diffusion_param,
