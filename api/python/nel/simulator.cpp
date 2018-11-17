@@ -339,7 +339,7 @@ static PyObject* build_py_agent(
     if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items))
         return NULL;
     PyObject* py_agent_id = PyLong_FromUnsignedLongLong(agent_id);
-    PyObject* py_agent = Py_BuildValue("(OOOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items, py_agent_id);
+    PyObject* py_agent = Py_BuildValue("(OOOOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items, py_agent_id);
     Py_DECREF(py_position); Py_DECREF(py_direction);
     Py_DECREF(py_scent); Py_DECREF(py_vision); Py_DECREF(py_gt_vision);
     Py_DECREF(py_items); Py_DECREF(py_agent_id);
@@ -364,7 +364,7 @@ static PyObject* build_py_agent(
     PyObject* py_scent; PyObject* py_vision; PyObject* py_gt_vision; PyObject* py_items;
     if (!build_py_agent(agent, config, py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items))
         return NULL;
-    PyObject* py_agent = Py_BuildValue("(OOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items);
+    PyObject* py_agent = Py_BuildValue("(OOOOOO)", py_position, py_direction, py_scent, py_vision, py_gt_vision, py_items);
     Py_DECREF(py_position); Py_DECREF(py_direction);
     Py_DECREF(py_scent); Py_DECREF(py_vision); Py_DECREF(py_gt_vision);
     Py_DECREF(py_items);
